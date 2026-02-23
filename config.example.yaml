@@ -39,6 +39,8 @@ invoice:
   create_timeout: 60s
   pdf_timeout: 30s
   idempotency_store: invoices/.idempotency.json
+  # Optional: sign idempotency records with HMAC-SHA256 to detect tampering.
+  idempotency_signing_key: ""
   default_status_query: "Ready to Invoice"
   default_list_limit: 20
   default_preview_format: pdf

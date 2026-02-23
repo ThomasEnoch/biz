@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"mime"
 	"mime/multipart"
+	"net/textproto"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -124,7 +125,14 @@ func (c *Client) doWithVersion(ctx context.Context, method, url string, body []b
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, perr.New(perr.KindNotFound, "notion page not found")
 		}
-		return nil, perr.New(perr.KindDependencyUnavailable, fmt.Sprintf("notion error: %s", resp.Status))
+		respSnippet := strings.TrimSpace(string(b))
+		if len(respSnippet) > 300 {
+			respSnippet = respSnippet[:300]
+		}
+		return nil, perr.New(
+			perr.KindDependencyUnavailable,
+			fmt.Sprintf("notion error: %s (%s %s) %s", resp.Status, method, url, respSnippet),
+		)
 	}
 	return nil, perr.New(perr.KindDependencyUnavailable, "notion unavailable")
 }
@@ -265,7 +273,10 @@ func (c *Client) UploadInvoicePDF(ctx context.Context, pageID, path string) erro
 
 	var multipartBody bytes.Buffer
 	mp := multipart.NewWriter(&multipartBody)
-	part, err := mp.CreateFormFile("file", filename)
+	partHeaders := make(textproto.MIMEHeader)
+	partHeaders.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, filename))
+	partHeaders.Set("Content-Type", contentType)
+	part, err := mp.CreatePart(partHeaders)
 	if err != nil {
 		return perr.Wrap(perr.KindInternal, "failed to create upload form file", err)
 	}
@@ -298,14 +309,15 @@ func (c *Client) UploadInvoicePDF(ctx context.Context, pageID, path string) erro
 	}
 
 	attachReq := map[string]any{
-		"children": []any{
-			map[string]any{
-				"object": "block",
-				"type":   "pdf",
-				"pdf": map[string]any{
-					"type": "file_upload",
-					"file_upload": map[string]any{
-						"id": created.ID,
+		"properties": map[string]any{
+			"Files & media": map[string]any{
+				"files": []any{
+					map[string]any{
+						"type": "file_upload",
+						"name": filename,
+						"file_upload": map[string]any{
+							"id": created.ID,
+						},
 					},
 				},
 			},
@@ -315,7 +327,7 @@ func (c *Client) UploadInvoicePDF(ctx context.Context, pageID, path string) erro
 	_, err = c.doWithVersion(
 		ctx,
 		http.MethodPatch,
-		fmt.Sprintf("%s/blocks/%s/children", c.BaseURL, pageID),
+		fmt.Sprintf("%s/pages/%s", c.BaseURL, pageID),
 		attachBody,
 		notionVersionUpload,
 		"application/json",
@@ -324,7 +336,7 @@ func (c *Client) UploadInvoicePDF(ctx context.Context, pageID, path string) erro
 }
 
 func (c *Client) MarkInvoiceStatus(ctx context.Context, pageID, status string) error {
-	payload := map[string]any{"properties": map[string]any{"Status": map[string]any{"select": map[string]any{"name": status}}}}
+	payload := map[string]any{"properties": map[string]any{"Status": map[string]any{"status": map[string]any{"name": status}}}}
 	body, _ := json.Marshal(payload)
 	url := fmt.Sprintf("%s/pages/%s", c.BaseURL, pageID)
 	_, err := c.do(ctx, http.MethodPatch, url, body)

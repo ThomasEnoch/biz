@@ -42,6 +42,7 @@ type Invoice struct {
 	CreateTimeout          time.Duration `mapstructure:"create_timeout"`
 	PDFTimeout             time.Duration `mapstructure:"pdf_timeout"`
 	IdempotencyStore       string        `mapstructure:"idempotency_store"`
+	IdempotencySigningKey  string        `mapstructure:"idempotency_signing_key"`
 	DefaultStatusQuery     string        `mapstructure:"default_status_query"`
 	DefaultListLimit       int           `mapstructure:"default_list_limit"`
 	DefaultPreviewFormat   string        `mapstructure:"default_preview_format"`

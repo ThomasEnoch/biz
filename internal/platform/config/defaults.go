@@ -37,6 +37,7 @@ func applyDefaults(v *viper.Viper) {
 	v.SetDefault("invoice.create_timeout", "60s")
 	v.SetDefault("invoice.pdf_timeout", "30s")
 	v.SetDefault("invoice.idempotency_store", "invoices/.idempotency.json")
+	v.SetDefault("invoice.idempotency_signing_key", "")
 	v.SetDefault("invoice.default_status_query", "Ready to Invoice")
 	v.SetDefault("invoice.default_list_limit", 20)
 	v.SetDefault("invoice.default_preview_format", "pdf")

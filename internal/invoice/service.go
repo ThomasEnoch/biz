@@ -2,6 +2,7 @@ package invoice
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -50,9 +51,10 @@ type LocalDataSource interface {
 }
 
 type idempotencyRecord struct {
-	Key      string       `json:"key"`
-	Result   CreateResult `json:"result"`
-	StoredAt time.Time    `json:"stored_at"`
+	Key       string       `json:"key"`
+	Result    CreateResult `json:"result"`
+	StoredAt  time.Time    `json:"stored_at"`
+	Signature string       `json:"signature,omitempty"`
 }
 
 type idempotencyStore map[string]idempotencyRecord
@@ -71,6 +73,7 @@ type Service struct {
 	FallbackFile           string
 	TemplateVersion        string
 	IdempotencyPath        string
+	IdempotencySigningKey  string
 	CreateTimeout          time.Duration
 	PDFTimeout             time.Duration
 	MaxRenderHTMLBytes     int
@@ -184,6 +187,18 @@ func (s *Service) loadIdempotency() (idempotencyStore, error) {
 	if err := json.Unmarshal(b, &store); err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(s.IdempotencySigningKey) == "" {
+		return store, nil
+	}
+	for k, rec := range store {
+		ok, err := s.verifyIdempotencyRecord(rec)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, perr.New(perr.KindValidation, "idempotency record signature invalid: "+k)
+		}
+	}
 	return store, nil
 }
 
@@ -194,9 +209,51 @@ func (s *Service) saveIdempotency(store idempotencyStore) error {
 	if err := os.MkdirAll(filepath.Dir(s.IdempotencyPath), 0o700); err != nil {
 		return err
 	}
+	if strings.TrimSpace(s.IdempotencySigningKey) != "" {
+		for k, rec := range store {
+			sig, err := s.signIdempotencyRecord(rec)
+			if err != nil {
+				return err
+			}
+			rec.Signature = sig
+			store[k] = rec
+		}
+	}
 	b, err := json.MarshalIndent(store, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(s.IdempotencyPath, b, 0o600)
+}
+
+func (s *Service) signIdempotencyRecord(rec idempotencyRecord) (string, error) {
+	payload := struct {
+		Key      string       `json:"key"`
+		Result   CreateResult `json:"result"`
+		StoredAt string       `json:"stored_at"`
+	}{
+		Key:      rec.Key,
+		Result:   rec.Result,
+		StoredAt: rec.StoredAt.UTC().Format(time.RFC3339Nano),
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	mac := hmac.New(sha256.New, []byte(s.IdempotencySigningKey))
+	if _, err := mac.Write(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func (s *Service) verifyIdempotencyRecord(rec idempotencyRecord) (bool, error) {
+	if strings.TrimSpace(rec.Signature) == "" {
+		return false, nil
+	}
+	want, err := s.signIdempotencyRecord(rec)
+	if err != nil {
+		return false, err
+	}
+	return hmac.Equal([]byte(strings.ToLower(strings.TrimSpace(rec.Signature))), []byte(want)), nil
 }

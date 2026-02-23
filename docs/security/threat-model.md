@@ -163,11 +163,12 @@ Current controls:
 
 Gaps:
 
-- idempotency store is still plain JSON.
+- idempotency store uses optional per-record HMAC signing (improved), but still remains a local JSON file and can be deleted/replaced.
 
 Recommended mitigations:
 
-- sign idempotency records or migrate to locked local store (sqlite),
+- keep `invoice.idempotency_signing_key` enabled in production profiles,
+- consider migrating to a locked local store (sqlite) for stronger anti-replacement guarantees,
 - extend integrity checks at load/save boundaries.
 
 ### TM-005: External dependency/availability failures

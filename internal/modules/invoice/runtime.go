@@ -47,6 +47,7 @@ func (Module) InitRuntime(rt *app.Runtime) error {
 		FallbackFile:           cfg.Invoice.FallbackFile,
 		TemplateVersion:        "v1",
 		IdempotencyPath:        cfg.Invoice.IdempotencyStore,
+		IdempotencySigningKey:  cfg.Invoice.IdempotencySigningKey,
 		CreateTimeout:          cfg.Invoice.CreateTimeout,
 		PDFTimeout:             cfg.Invoice.PDFTimeout,
 		MaxRenderHTMLBytes:     cfg.Invoice.MaxRenderHTMLBytes,

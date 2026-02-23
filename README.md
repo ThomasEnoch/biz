@@ -156,6 +156,10 @@ Records mutation safety features:
 - `--if-last-edited <RFC3339>` optimistic concurrency check for update/archive
 - `--data-file` to load mutation payloads from JSON files
 
+Invoice idempotency hardening:
+- optional `invoice.idempotency_signing_key` enables HMAC signing/verification of idempotency records
+- if enabled, tampered idempotency records fail validation during `invoice create`
+
 ## Tamper-Evident Audit Log
 
 Enable signed, hash-chained JSONL audit logging:

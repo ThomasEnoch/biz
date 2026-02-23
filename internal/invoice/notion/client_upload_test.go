@@ -70,27 +70,31 @@ func TestUploadInvoicePDF(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{"id":"fu_123","status":"uploaded"}`)
 			return
-		case r.Method == http.MethodPatch && r.URL.Path == "/v1/blocks/page_123/children":
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/pages/page_123":
 			attached = true
 			var body map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Fatalf("decode attach body: %v", err)
 			}
-			children, ok := body["children"].([]any)
-			if !ok || len(children) != 1 {
-				t.Fatalf("unexpected children payload: %#v", body["children"])
-			}
-			child, ok := children[0].(map[string]any)
+			properties, ok := body["properties"].(map[string]any)
 			if !ok {
-				t.Fatalf("unexpected child payload: %#v", children[0])
+				t.Fatalf("missing properties payload: %#v", body["properties"])
 			}
-			pdf, ok := child["pdf"].(map[string]any)
+			filesProp, ok := properties["Files & media"].(map[string]any)
 			if !ok {
-				t.Fatalf("missing pdf payload: %#v", child)
+				t.Fatalf("missing files property payload: %#v", properties)
 			}
-			fileUpload, ok := pdf["file_upload"].(map[string]any)
+			files, ok := filesProp["files"].([]any)
+			if !ok || len(files) != 1 {
+				t.Fatalf("unexpected files payload: %#v", filesProp["files"])
+			}
+			fileObj, ok := files[0].(map[string]any)
+			if !ok {
+				t.Fatalf("unexpected file object payload: %#v", files[0])
+			}
+			fileUpload, ok := fileObj["file_upload"].(map[string]any)
 			if !ok || fileUpload["id"] != "fu_123" {
-				t.Fatalf("unexpected file upload payload: %#v", pdf["file_upload"])
+				t.Fatalf("unexpected file upload payload: %#v", fileObj["file_upload"])
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = io.WriteString(w, `{}`)
